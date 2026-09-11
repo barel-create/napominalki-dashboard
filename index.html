@@ -81,10 +81,11 @@ function render(data) {
   document.getElementById('content').innerHTML =
     '<table><thead><tr><th>Бина</th><th>Охад</th></tr></thead>' +
     '<tbody><tr><td>' + colBina + '</td><td>' + colOhad + '</td></tr></tbody></table>';
-  const now = new Date();
-  const pad = function(n) { return String(n).padStart(2, '0'); };
-  document.getElementById('updated').textContent =
-    'Обновлено: ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  // "Обновлено" shows when the BOT's cache last changed (data.cachedAt, written
+  // server-side by checkLessons()/refreshLessonsCache in Code.gs) — not when this
+  // page happened to be opened. If the per-minute trigger ever stalls, this is
+  // what would reveal it; a local browser clock never would.
+  document.getElementById('updated').textContent = 'Обновлено: ' + escapeHtml(data.cachedAt || '—');
 }
 
 function showError(msg) {
