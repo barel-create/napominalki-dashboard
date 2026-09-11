@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Расписание на сегодня</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--pending-bg:#f2f2f2;--pending-fg:#333;--seated-bg:#fff3b0;--seated-fg:#6b5900;
+--started-bg:#b7f0b7;--started-fg:#1b5e20;--canceled-bg:#f8b7b7;--canceled-fg:#7a1f1f;}
+*{box-sizing:border-box;}
+body{font-family:-apple-system,Roboto,Arial,sans-serif;margin:0;padding:12px;
+background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#222);}
+h1{font-size:16px;text-align:center;margin:4px 0 12px;}
+table{width:100%;border-collapse:collapse;table-layout:fixed;}
+th{font-size:14px;padding:6px 4px;background:var(--tg-theme-secondary-bg-color,#eee);border-radius:6px 6px 0 0;}
+td{vertical-align:top;padding:4px;}
+.cell{border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;}
+.time{font-weight:600;}
+.comment{margin-top:2px;font-size:11px;opacity:0.8;}
+.status-pending{background:var(--pending-bg);color:var(--pending-fg);}
+.status-seated{background:var(--seated-bg);color:var(--seated-fg);}
+.status-started{background:var(--started-bg);color:var(--started-fg);}
+.status-canceled{background:var(--canceled-bg);color:var(--canceled-fg);text-decoration:line-through;opacity:0.7;}
+.empty{text-align:center;opacity:0.6;font-size:12px;padding:12px 0;}
+.updated{text-align:center;font-size:11px;opacity:0.5;margin-top:10px;}
+.error{text-align:center;font-size:13px;color:#7a1f1f;padding:24px 12px;}
+</style>
+</head>
+<body>
+<h1 id="title">Расписание</h1>
+<div id="content">
+  <div class="empty">Загрузка…</div>
+</div>
+<div class="updated" id="updated"></div>
+
+<script>
+// ============================================================
+// Static replacement for the old Apps-Script-served dashboard page (Sep 2026).
+// Moved here (GitHub Pages) solely to drop Google's "made by an Apps Script
+// user" banner, which only appears on pages Apps Script renders itself — it
+// never applied to the JSON API, which stays on Apps Script unchanged.
+//
+// One-shot design, unchanged from before: fetch the cache snapshot exactly
+// once on load, render it, and NEVER fetch again while this page is open.
+// Closing and reopening the Web App is the only way to see a newer snapshot
+// — this mirrors computeTodayState()/getCachedTodaysLessons() in Code.gs,
+// which this page never touches or duplicates; it only reads the one
+// existing ?action=state JSON endpoint.
+// ============================================================
+
+// ↓↓↓ Update these two if the Apps Script deployment URL or token ever change
+// (must match WEB_APP_URL / TTS_TOKEN in Code.gs).
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzcQC75UXLwSxnLqHNGZqKkEIWUWU880zHHuoKN2243ZS7fTMuor_XOKlMZ8-Zn5uCyZA/exec';
+const TOKEN = 'ddb3115069f6bd6efa89d8bbee0408ffe2f24b5a93c382f2';
+
+const STATUS_ICON = { pending: '⚪', seated: '🟡', started: '🟢', canceled: '🔴' };
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderColumn(lessons) {
+  if (!lessons || lessons.length === 0) return '<div class="empty">Уроков нет</div>';
+  return lessons.map(function(l) {
+    const icon = STATUS_ICON[l.status] || '⚪';
+    const started = (l.status === 'started' && l.startedAt) ? ' (началось в ' + escapeHtml(l.startedAt) + ')' : '';
+    const comment = l.spokenComment ? '<div class="comment">💬 ' + escapeHtml(l.spokenComment) + '</div>' : '';
+    return '<div class="cell status-' + l.status + '">' +
+           '<div class="time">' + icon + ' ' + escapeHtml(l.timeRange) + '</div>' +
+           '<div class="name">' + escapeHtml(l.lessonName) + started + '</div>' +
+           comment +
+           '</div>';
+  }).join('');
+}
+
+function render(data) {
+  document.getElementById('title').textContent = 'Расписание на ' + data.date;
+  const colBina = renderColumn(data.children.Bina);
+  const colOhad = renderColumn(data.children.Ohad);
+  document.getElementById('content').innerHTML =
+    '<table><thead><tr><th>Бина</th><th>Охад</th></tr></thead>' +
+    '<tbody><tr><td>' + colBina + '</td><td>' + colOhad + '</td></tr></tbody></table>';
+  const now = new Date();
+  const pad = function(n) { return String(n).padStart(2, '0'); };
+  document.getElementById('updated').textContent =
+    'Обновлено: ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+}
+
+function showError(msg) {
+  document.getElementById('content').innerHTML = '<div class="error">⚠️ ' + escapeHtml(msg) + '</div>';
+}
+
+if (window.Telegram && Telegram.WebApp) {
+  Telegram.WebApp.ready();
+  Telegram.WebApp.expand();
+}
+
+fetch(WEB_APP_URL + '?action=state&token=' + encodeURIComponent(TOKEN))
+  .then(function(resp) {
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  })
+  .then(function(data) {
+    if (data && data.error) throw new Error(data.error);
+    render(data);
+  })
+  .catch(function(err) {
+    showError('Не удалось загрузить расписание. Попробуйте закрыть и открыть снова.');
+    console.error(err);
+  });
+</script>
+</body>
+</html>
