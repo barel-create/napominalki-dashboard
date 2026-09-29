@@ -7,13 +7,25 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{--pending-bg:#f2f2f2;--pending-fg:#333;--seated-bg:#fff3b0;--seated-fg:#6b5900;
---started-bg:#b7f0b7;--started-fg:#1b5e20;--canceled-bg:#f8b7b7;--canceled-fg:#7a1f1f;}
+--started-bg:#b7f0b7;--started-fg:#1b5e20;--canceled-bg:#f8b7b7;--canceled-fg:#7a1f1f;
+--body-bg:#fff;--body-fg:#222;--header-bg:#eee;}
+/* Sep 2026: dark-mode override for the Napominalki desktop app's embedded
+   iframe (see napominalki-tts's web/app.js -- it reloads this page with a
+   ?theme=dark/light query param whenever the app's own theme changes,
+   since it's a different origin and can't reach into this page's DOM
+   directly). Telegram's own theme (--tg-theme-*, read further down) still
+   takes priority when this page is opened as an actual Telegram Web App,
+   since that path never sends ?theme= at all -- this block only kicks in
+   for [data-theme="dark"], which only JS sets, and only from the URL param. */
+:root[data-theme="dark"]{--pending-bg:#3a3a3d;--pending-fg:#d8d8da;--seated-bg:#5c4f12;--seated-fg:#ffe073;
+--started-bg:#1b4620;--started-fg:#8ee79a;--canceled-bg:#4a1f1f;--canceled-fg:#ff9f9f;
+--body-bg:#16161a;--body-fg:#f2f2f4;--header-bg:#242428;}
 *{box-sizing:border-box;}
 body{font-family:-apple-system,Roboto,Arial,sans-serif;margin:0;padding:12px;
-background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#222);}
+background:var(--tg-theme-bg-color,var(--body-bg));color:var(--tg-theme-text-color,var(--body-fg));}
 h1{font-size:16px;text-align:center;margin:4px 0 12px;}
 table{width:100%;border-collapse:collapse;table-layout:fixed;}
-th{font-size:14px;padding:6px 4px;background:var(--tg-theme-secondary-bg-color,#eee);border-radius:6px 6px 0 0;}
+th{font-size:14px;padding:6px 4px;background:var(--tg-theme-secondary-bg-color,var(--header-bg));border-radius:6px 6px 0 0;}
 td{vertical-align:top;padding:4px;}
 .cell{border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;}
 .time{font-weight:600;}
@@ -28,10 +40,8 @@ td{vertical-align:top;padding:4px;}
 </style>
 </head>
 <body>
-<h1 id="title">Расписание</h1>
-<div id="content">
-  <div class="empty">Загрузка…</div>
-</div>
+<h1 id="title">Расписание на сегодня</h1>
+<div id="content"></div>
 <div class="updated" id="updated"></div>
 
 <script>
@@ -46,7 +56,9 @@ td{vertical-align:top;padding:4px;}
 // Closing and reopening the Web App is the only way to see a newer snapshot
 // — this mirrors computeTodayState()/getCachedTodaysLessons() in Code.gs,
 // which this page never touches or duplicates; it only reads the one
-// existing ?action=state JSON endpoint.
+// existing ?action=state JSON endpoint. (The napominalki-tts desktop app
+// gets around this same limitation from its own side, by reloading this
+// whole page on an interval — see that repo's web/app.js.)
 // ============================================================
 
 // ↓↓↓ Update these two if the Apps Script deployment URL or token ever change
@@ -55,6 +67,18 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzcQC75UXLwSxnLqHNG
 const TOKEN = 'ddb3115069f6bd6efa89d8bbee0408ffe2f24b5a93c382f2';
 
 const STATUS_ICON = { pending: '⚪', seated: '🟡', started: '🟢', canceled: '🔴' };
+
+// Sep 2026: read ?theme=dark|light from the URL (sent only by the
+// napominalki-tts desktop app's embedded iframe -- see the CSS comment
+// above) and flip the page into dark mode before anything renders, so
+// there's no flash of the wrong theme while the schedule loads.
+(function applyThemeFromQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  const theme = params.get('theme');
+  if (theme === 'dark' || theme === 'light') {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+})();
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -111,5 +135,6 @@ fetch(WEB_APP_URL + '?action=state&token=' + encodeURIComponent(TOKEN))
     console.error(err);
   });
 </script>
+
 </body>
 </html>
